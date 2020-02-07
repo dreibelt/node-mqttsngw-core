@@ -22,6 +22,12 @@ module.exports = (bus, log) => {
 		}
 	}).state('publishToBroker', (ctx, i, o, next) => {
 		// Send publish to broker
+		// Wait for response from broker
+		i(['brokerPublishFromClient', ctx.clientKey, 'res'], (data) => {
+			if (data.msgId !== ctx.msgId) return;
+			if (data.error) return next(new Error('Rejected: congestion'));
+			next(null);
+		});
 		o(['brokerPublishFromClient', ctx.clientKey, 'req'], {
 			clientKey: ctx.clientKey,
 			msgId: ctx.msgId,
@@ -30,13 +36,7 @@ module.exports = (bus, log) => {
 			payload: ctx.payload,
 			retain: ctx.retain
 		});
-
-		// Wait for response from broker
-		i(['brokerPublishFromClient', ctx.clientKey, 'res'], (data) => {
-			if (data.msgId !== ctx.msgId) return;
-			if (data.error) return next(new Error('Rejected: congestion'));
-			next(null);
-		});
+		
 	}).final((ctx, i, o, end, err) => {
 		// Send negative puback if something bad happend before
 		if (err instanceof Error) {

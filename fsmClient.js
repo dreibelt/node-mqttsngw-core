@@ -30,8 +30,6 @@ module.exports = (bus, log) => {
 		// TODO
 		next(new Error('willMessage is not implemented'));
 	}).state('connectBroker', (ctx, i, o, next) => {
-		// Ask broker module to conncet to broker
-		o(['brokerConnect', ctx.clientKey, 'req'], Object.assign({}, ctx));
 
 		// Wait for a result from the broker
 		i(['brokerConnect', ctx.clientKey, 'res'], (res) => {
@@ -51,6 +49,10 @@ module.exports = (bus, log) => {
 			ctx.connectedToClient = true;
 			next('active');
 		});
+
+		
+		// Ask broker module to conncet to broker
+		o(['brokerConnect', ctx.clientKey, 'req'], Object.assign({}, ctx));
 
 		// The broker module must return at least a timeout!
 		// -> No next.timeout() in this state.
