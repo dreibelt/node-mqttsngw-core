@@ -1,6 +1,6 @@
 {
   "name": "mqttsngw-core",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "MQTT-SN Gateway: Core module",
   "main": "index.js",
   "scripts": {
@@ -9,19 +9,19 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jue89/node-mqttsngw-core.git"
+    "url": "git+https://github.com/dreibelt/node-mqttsngw-core.git"
   },
   "keywords": [
     "mqttsn",
     "dtls",
     "sensornet"
   ],
-  "author": "Jue <me@jue.yt>",
+  "author": "DR <dreibelt@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/jue89/node-mqttsngw-core/issues"
+    "url": "https://github.com/dreibelt/node-mqttsngw-core/issues"
   },
-  "homepage": "https://github.com/jue89/node-mqttsngw-core#readme",
+  "homepage": "https://github.com/dreibelt/node-mqttsngw-core#readme",
   "devDependencies": {
     "eventemitter2": "^5.0.1",
     "happiness": "^10.0.2",

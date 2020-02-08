@@ -16,6 +16,7 @@ module.exports = (bus, log) => {
 		ctx.connectedToClient = false;
 		ctx.connectedToBroker = false;
 		ctx.topics = [];
+		ctx.sleepingMessageStore = [];
 
 		// Create promise for for conack
 		ctx.connack = new Promise((resolve) => { ctx.connackResolve = resolve; });
@@ -59,8 +60,14 @@ module.exports = (bus, log) => {
 	}).state('active', (ctx, i, o, next) => {
 		// Listen for disconnects from client
 		i(['snUnicastIngress', ctx.clientKey, 'disconnect'], (data) => {
-			// TODO: duration? -> sleep instead of disconnect
-			next(null);
+			var duration = data.duration || 0;
+			ctx.duration = duration;
+			if(duration > 0){
+				next('asleep');
+			}
+			else {
+				next(null);
+			}
 		});
 
 		// Listen for disconnects from broker
@@ -111,7 +118,7 @@ module.exports = (bus, log) => {
 
 		// TODO: Handle will updates
 
-		// React to ping requests
+		// React to ping requests while active
 		i(['snUnicastIngress', ctx.clientKey, 'pingreq'], () => {
 			o(['snUnicastOutgress', ctx.clientKey, 'pingresp'], {
 				clientKey: ctx.clientKey,
@@ -119,12 +126,120 @@ module.exports = (bus, log) => {
 			});
 		});
 
+		// clear message buffer
+		while(ctx.sleepingMessageStore.length > 0){
+			var data = ctx.sleepingMessageStore.shift();
+			data.topics = ctx.topics;
+			publishToClientFactory.run(data);
+		}
+
 		// Timeout after given duration. This will be reset by any ingress packet.
 		i(['snUnicastIngress', ctx.clientKey, '*'], () => timeoutTrigger());
 		timeoutTrigger();
 		function timeoutTrigger () {
 			next.timeout(ctx.duration * 1000, new Error('Received no ping requests within given connection duration'));
 		}
+	}).state('asleep', (ctx, i, o, next) => {
+		// TODO: Wake
+		// client events must transition back to active with pingreq
+		// at the completion of this transmition, the waking event 
+		// should then be consumed 
+		// React to ping requests while asleep
+		i(['snUnicastIngress', ctx.clientKey, 'pingreq'], () => {
+			// TODO: Consume message buffer
+			if(ctx.sleepingMessageStore.length > 0)
+			next('awake');
+		});
+
+		// Handle reconnect
+		i(['snUnicastIngress', ctx.clientKey, 'connect'], (data) => {
+			// Connection was successfully established
+			ctx.sessionResumed = true;
+			ctx.connectedToBroker = true;
+			const connack = {
+				clientKey: ctx.clientKey,
+				cmd: 'connack',
+				returnCode: 'Accepted'
+			};
+			ctx.connackResolve(connack);
+			o(['snUnicastOutgress', ctx.clientKey, 'connack'], connack);
+			ctx.connectedToClient = true;
+			next('active');
+		});
+
+		i(['snUnicastIngress', ctx.clientKey, 'disconnect'], (data) => {
+			var duration = data.duration || 0;
+			ctx.duration = duration;
+			if(duration > 0){
+				o(['snUnicastOutgress', ctx.clientKey, 'disconnect'], {
+					clientKey: ctx.clientKey,
+					duration: duration,
+					cmd: 'disconnect'
+				});
+				timeoutTrigger();
+
+			}
+			else {
+				next(null);
+			}
+		});
+		
+		// TODO: Sleep Storage responses
+		i(['brokerPublishToClient', ctx.clientKey, 'req'], (data) => {
+			// Kick-off new state machine to handle publish messages
+			ctx.sleepingMessageStore.push(data);
+			// TODO: Responses should be handled 
+		});
+
+		o(['snUnicastOutgress', ctx.clientKey, 'disconnect'], {
+			clientKey: ctx.clientKey,
+			duration: ctx.duration,
+			cmd: 'disconnect'
+		});
+
+		timeoutTrigger();
+		function timeoutTrigger () {
+			next.timeout(ctx.duration * 1000, new Error('Received no ping requests within given connection duration'));
+		}
+
+	}).state('awake', (ctx, i, o, next) => {
+		// disconnect
+		i(['snUnicastIngress', ctx.clientKey, 'disconnect'], (data) => {
+			var duration = data.duration || 0;
+			if(duration > 0){
+				next('asleep');
+			}
+			else {
+				next(null);
+			}
+		});
+
+		// TODO: Sleep Storage responses
+		// an awake state can still queue new messages
+		i(['brokerPublishToClient', ctx.clientKey, 'req'], (data) => {
+			// Kick-off new state machine to handle publish messages
+			ctx.sleepingMessageStore.push(data);
+			// TODO: Responses should be handled 
+		});
+
+		// after a sleep
+		if(ctx.sleepingMessageStore.length > 0){
+			// TODO: 
+			// These message may require different response handling
+			// since they were delayed in transport
+			while(ctx.sleepingMessageStore.length > 0){
+				var data = ctx.sleepingMessageStore.shift();
+				data.topics = ctx.topics;
+				publishToClientFactory.run(data);
+			}
+			
+			o(['snUnicastOutgress', ctx.clientKey, 'pingresp'], {
+				clientKey: ctx.clientKey,
+				cmd: 'pingresp'
+			});
+			next('asleep');
+		}
+
 	}).final((ctx, i, o, end, err) => {
 		if (!ctx.connectedToClient) {
 			// Send negative connack, since the error occured
