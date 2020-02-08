@@ -146,8 +146,6 @@ module.exports = (bus, log) => {
 		// should then be consumed 
 		// React to ping requests while asleep
 		i(['snUnicastIngress', ctx.clientKey, 'pingreq'], () => {
-			// TODO: Consume message buffer
-			if(ctx.sleepingMessageStore.length > 0)
 			next('awake');
 		});
 
@@ -233,12 +231,13 @@ module.exports = (bus, log) => {
 				publishToClientFactory.run(data);
 			}
 			
-			o(['snUnicastOutgress', ctx.clientKey, 'pingresp'], {
-				clientKey: ctx.clientKey,
-				cmd: 'pingresp'
-			});
-			next('asleep');
 		}
+		
+		o(['snUnicastOutgress', ctx.clientKey, 'pingresp'], {
+			clientKey: ctx.clientKey,
+			cmd: 'pingresp'
+		});
+		next('asleep');
 
 	}).final((ctx, i, o, end, err) => {
 		if (!ctx.connectedToClient) {
