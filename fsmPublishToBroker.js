@@ -11,6 +11,7 @@ module.exports = (bus, log) => {
 		if (ctx.qos > 1) return next(new Error('Rejected: congestion'));
 
 		// Handle given topic
+		//TODO: support for "pre-defined" topic ids
 		if (ctx.topicIdType === 'normal' && ctx.topics[ctx.topicId - 1]) {
 			ctx.topic = ctx.topics[ctx.topicId - 1];
 			next('publishToBroker');

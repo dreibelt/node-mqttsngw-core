@@ -1,12 +1,13 @@
 const FSM = require('edfsm');
-module.exports = (bus, log) => {
+module.exports = (bus, log, gwId) => {
 	const clientFactory = require('./fsmClient.js')(bus, log);
 	return FSM({
 		fsmName: '[Core] Main',
 		log: log,
 		input: bus,
 		output: bus,
-		firstState: 'init'
+		firstState: 'init',
+		gwId: gwId
 	}).state('init', (ctx, i, o, next) => {
 		ctx.clients = {};
 		next('listening');
@@ -27,6 +28,22 @@ module.exports = (bus, log) => {
 			}
 		});
 		// TODO: SEARCHGW, ADVERTISE
+		i(['snUnicastIngress', '*', 'searchgw'], (packet) => {
+			o(['snUnicastOutgress', packet.clientKey, 'gwinfo'], {
+				cmd: 'gwinfo',
+				gwId: ctx.gwId
+			});
+		});
+
+		//TODO: Configurations
+		var interval = 900 * 1000; 
+		var advertise = setInterval(() => {
+			o(['snUnicastOutgress', '*', 'advertise'], {
+				cmd: 'gwinfo',
+				gwId: ctx.gwId,
+				duration: 900
+			});
+		}, interval);
 	}).final((ctx, i, o, end) => {
 		Object.keys(ctx.clients).forEach((key) => {
 			ctx.clients[key].next(null);
