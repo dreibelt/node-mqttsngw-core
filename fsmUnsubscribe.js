@@ -18,6 +18,13 @@ module.exports = (bus, log) => {
 			next(new Error('Rejected: invalid topic ID'));
 		}
 	}).state('brokerUnsubscribe', (ctx, i, o, next) => {
+		// Wait for the response from the broker
+		i(['brokerUnsubscribe', ctx.clientKey, 'res'], (data) => {
+			if (data.msgId !== ctx.msgId) return;
+			if (data.error) return next(new Error('Rejected: congestion'));
+			next(null);
+		});
+		
 		// Send subscribe request to broker
 		o(['brokerUnsubscribe', ctx.clientKey, 'req'], {
 			clientKey: ctx.clientKey,
@@ -25,12 +32,6 @@ module.exports = (bus, log) => {
 			topic: ctx.topic
 		});
 
-		// Wait for the response from the broker
-		i(['brokerUnsubscribe', ctx.clientKey, 'res'], (data) => {
-			if (data.msgId !== ctx.msgId) return;
-			if (data.error) return next(new Error('Rejected: congestion'));
-			next(null);
-		});
 	}).final((ctx, i, o, end, err) => {
 		// An error occured -> send no UNSUBACK
 		if (err instanceof Error) return end();
