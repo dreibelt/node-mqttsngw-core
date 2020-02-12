@@ -81,6 +81,7 @@ module.exports = (bus, log) => {
 			// TODO: Check if space in topic store is left
 			let topicId = ctx.topics.indexOf(data.topicName) + 1;
 			if (topicId === 0) topicId = ctx.topics.push(data.topicName);
+
 			o(['snUnicastOutgress', ctx.clientKey, 'regack'], {
 				clientKey: ctx.clientKey,
 				cmd: 'regack',
@@ -99,6 +100,7 @@ module.exports = (bus, log) => {
 
 		// Handle unsubscribe
 		i(['snUnicastIngress', ctx.clientKey, 'unsubscribe'], (data) => {
+			
 			// Kick-off new state machine to handle subscribe messages
 			unsubscribeFactory.run(data);
 		});
@@ -113,6 +115,7 @@ module.exports = (bus, log) => {
 		i(['brokerPublishToClient', ctx.clientKey, 'req'], (data) => {
 			// Kick-off new state machine to handle publish messages
 			data.topics = ctx.topics;
+			data.clientKey = ctx.clientKey;
 			publishToClientFactory.run(data);
 		});
 
@@ -232,7 +235,7 @@ module.exports = (bus, log) => {
 			}
 			
 		}
-		
+
 		o(['snUnicastOutgress', ctx.clientKey, 'pingresp'], {
 			clientKey: ctx.clientKey,
 			cmd: 'pingresp'
