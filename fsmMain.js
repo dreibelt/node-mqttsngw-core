@@ -39,7 +39,7 @@ module.exports = (bus, log, gwId) => {
 		var interval = 900 * 1000; 
 		var advertise = setInterval(() => {
 			o(['snUnicastOutgress', '*', 'advertise'], {
-				cmd: 'gwinfo',
+				cmd: 'advertise',
 				gwId: ctx.gwId,
 				duration: 900
 			});
